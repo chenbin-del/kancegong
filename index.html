@@ -258,22 +258,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
       <div class="setting-item">
         <span class="label">核心重点题权重</span>
         <div class="weight-slider">
-          <input type="range" id="weightHigh" min="1" max="15" value="10" oninput="updateWeight()">
-          <span class="weight-val" id="weightHighVal">10x</span>
+          <input type="range" id="weightHigh" min="0" max="10" value="9" oninput="updateWeight()">
+          <span class="weight-val" id="weightHighVal">9x</span>
         </div>
       </div>
       <div class="setting-item">
         <span class="label">一般重要题权重</span>
         <div class="weight-slider">
-          <input type="range" id="weightMid" min="1" max="10" value="4" oninput="updateWeight()">
-          <span class="weight-val" id="weightMidVal">4x</span>
+          <input type="range" id="weightMid" min="0" max="10" value="1" oninput="updateWeight()">
+          <span class="weight-val" id="weightMidVal">1x</span>
         </div>
       </div>
       <div class="setting-item">
         <span class="label">辅助了解题权重</span>
         <div class="weight-slider">
-          <input type="range" id="weightLow" min="1" max="5" value="1" oninput="updateWeight()">
-          <span class="weight-val" id="weightLowVal">1x</span>
+          <input type="range" id="weightLow" min="0" max="10" value="0" oninput="updateWeight()">
+          <span class="weight-val" id="weightLowVal">0x</span>
         </div>
       </div>
     </div>
@@ -450,7 +450,7 @@ const STATS = {"基础知识": {"total": 488, "choice": 314, "judge": 161, "shor
 
 let homeMode = 'level';
 let selectedLevel = null;
-let settings = {num:10, customNum:null, weights:{high:10,mid:4,low:1}, seenWeight:30, types:{single:true,multi:true,judge:true,short:false}, chapters:new Set()};
+let settings = {num:10, customNum:null, weights:{high:9,mid:1,low:0}, seenWeight:30, types:{single:true,multi:true,judge:true,short:false}, chapters:new Set()};
 let browseSettings = {types:{single:true,multi:true,judge:true,short:true}, chapters:new Set()};
 let quizList = [], curIdx = 0, answers = [], answeredSet = new Set();
 let browseList = [], browseIdx = 0;
@@ -466,6 +466,9 @@ function loadSettings(){
   try{
     let s = JSON.parse(localStorage.getItem('kc_settings')||'{}');
     if(s.weights)settings.weights={...settings.weights,...s.weights};
+    settings.weights.high=Math.min(10,Math.max(0,parseInt(settings.weights.high)||0));
+    settings.weights.mid=Math.min(10,Math.max(0,parseInt(settings.weights.mid)||0));
+    settings.weights.low=Math.min(10,Math.max(0,parseInt(settings.weights.low)||0));
     if(s.seenWeight!=null)settings.seenWeight=s.seenWeight;
     if(s.types)settings.types={...settings.types,...s.types};
   }catch(e){}
@@ -888,9 +891,10 @@ function startQuiz(){
 }
 
 function weightedRandom(source,count){
+  let seenKeys=new Set(Object.keys(getStats().records||{}));
   let seen=[], unseen=[];
   source.forEach(q=>{
-    if(isQuestionSeen(q))seen.push(q);else unseen.push(q);
+    if(seenKeys.has(getQKey(q)))seen.push(q);else unseen.push(q);
   });
   let unseenCount = Math.round(count * (100-settings.seenWeight)/100);
   let seenCount = count - unseenCount;
@@ -916,16 +920,18 @@ function weightedPick(source,count){
     for(let i=0;i<w;i++)weighted.push(q);
   });
   let result=[], used=new Set();
-  let attempts=0;
-  while(result.length<count&&result.length<source.length&&attempts<count*100){
-    let q=weighted[Math.floor(Math.random()*weighted.length)];
-    let key=q.level+'|'+q.question;
-    if(!used.has(key)){used.add(key);result.push(q);}
-    attempts++;
+  if(weighted.length>0){
+    let attempts=0;
+    while(result.length<count&&result.length<source.length&&attempts<count*100){
+      let q=weighted[Math.floor(Math.random()*weighted.length)];
+      let key=getQKey(q);
+      if(!used.has(key)){used.add(key);result.push(q);}
+      attempts++;
+    }
   }
   if(result.length<count){
     source.forEach(q=>{
-      let key=q.level+'|'+q.question;
+      let key=getQKey(q);
       if(!used.has(key)&&result.length<count){used.add(key);result.push(q);}
     });
   }

@@ -1,21 +1,20 @@
-const CACHE_NAME = 'kancegong-v3';
-const ASSETS = [
-  './index.html',
-  './manifest.json',
+const CACHE_NAME = 'kancegong-v4';
+const ICONS = [
   './icon-192.png',
   './icon-512.png'
 ];
 
-// 安装：缓存核心文件
+// 安装：只预缓存小体积图标；index.html / manifest 为动态大文件，
+// 不在安装阶段一次性写入缓存，避免弱网把残缺页面固化进缓存。
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      return cache.addAll(ICONS);
     }).then(() => self.skipWaiting())
   );
 });
 
-// 激活：清理旧缓存并接管页面
+// 激活：清理旧版本缓存并接管页面
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {

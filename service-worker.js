@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kancegong-v4';
+const CACHE_NAME = 'kancegong-v5';
 const ICONS = [
   './icon-192.png',
   './icon-512.png'

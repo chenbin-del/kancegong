@@ -230,6 +230,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
 .hist-group-date{font-size:15px;font-weight:700;color:#333;flex-shrink:0}
 .hist-group-meta{font-size:11px;color:#999}
 .hist-group-arrow{font-size:13px;color:#1e88e5;flex-shrink:0}
+.hist-group-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hist-group-rate{font-size:15px;font-weight:700;color:#1e88e5}
 .hist-group-body.collapsed{display:none}
 
 
@@ -1381,9 +1383,10 @@ function renderHistory(){
   list.innerHTML=groups.map(g=>{
     let gt=g.recs.reduce((s,r)=>({total:s.total+(r.total||0),correct:s.correct+(r.correct||0),wrong:s.wrong+(r.wrong||0)}),{total:0,correct:0,wrong:0});
     let collapsed=historyCollapsed.has(g.key);
+    let gRate=gt.total>0?Math.round(gt.correct/gt.total*100):0;
     let head='<div class="hist-group-head" onclick="toggleHistoryGroup(\''+g.key+'\')">'+
-      '<div class="hist-group-main"><div class="hist-group-date">'+dateLabel(g.recs[0].time)+'</div><div class="hist-group-meta">'+g.recs.length+' 场 · 对 '+gt.correct+' · 错 '+gt.wrong+'</div></div>'+
-      '<div class="hist-group-arrow">'+(collapsed?'▸':'▾')+'</div></div>';
+      '<div class="hist-group-main"><div class="hist-group-date">'+dateLabel(g.recs[0].time)+'</div><div class="hist-group-meta">'+g.recs.length+' 场 · 共 '+gt.total+' 题 · 对 '+gt.correct+' · 错 '+gt.wrong+'</div></div>'+
+      '<div class="hist-group-right"><div class="hist-group-rate">'+gRate+'%</div><div class="hist-group-arrow">'+(collapsed?'▸':'▾')+'</div></div></div>';
     let body='<div class="hist-group-body'+(collapsed?' collapsed':'')+'">'+g.recs.map(historyCardHtml).join('')+'</div>';
     return '<div class="hist-group">'+head+body+'</div>';
   }).join('');

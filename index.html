@@ -196,6 +196,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
 .wrong-card .w-q{font-size:13px;color:#333;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .wrong-card .w-meta{display:flex;justify-content:space-between;font-size:10px;color:#999}
 
+.hist-card{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.hist-head{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.hist-main{min-width:0}
+.hist-label{font-size:14px;font-weight:600;color:#333}
+.hist-time{font-size:11px;color:#999;margin-top:2px}
+.hist-rate{font-size:18px;font-weight:700;color:#1e88e5;flex-shrink:0}
+.hist-stats{display:flex;gap:14px;font-size:12px;color:#666;margin-top:8px}
+.hist-body{margin-top:4px}
+.hist-empty{font-size:12px;color:#bbb;padding:6px 0}
+.hist-actions{margin-top:10px}
+.hist-actions button{width:100%;padding:11px;border-radius:10px;font-size:13px;font-weight:600;border:none;cursor:pointer}
+
+
 .empty{text-align:center;padding:50px 20px;color:#bbb}
 .empty .e-icon{font-size:48px;margin-bottom:10px;opacity:.5}
 
@@ -227,7 +240,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
   <div class="level-grid" id="levelGrid"></div>
   <div style="padding:0 14px">
     <div class="setting-group" style="margin-bottom:0">
-      <div class="setting-item" onclick="goWrong()">
+      <div class="setting-item" onclick="goHistory()">
+        <span class="label">🗂️ 学习记录</span>
+        <span style="color:#1e88e5;font-size:13px" id="historyCount">0场</span>
+      </div>
+    <div class="setting-item" onclick="goWrong()">
         <span class="label">📕 错题本</span>
         <span style="color:#f44336;font-size:13px" id="wrongCount">0题</span>
       </div>
@@ -431,6 +448,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
   <div class="wrong-list" id="wrongList"></div>
 </div>
 
+<!-- 学习记录 -->
+<div id="page-history" class="page">
+  <div class="navbar">
+    <span class="back" onclick="goHome()">←</span>
+    <span class="title">学习记录</span>
+    <span class="back" style="font-size:13px" onclick="clearHistory()">清空</span>
+  </div>
+  <div class="result-stats" style="padding:14px 14px 0">
+    <div class="result-stat"><div class="num" id="hSessions">0</div><div class="label">学习场次</div></div>
+    <div class="result-stat"><div class="num" id="hTotal">0</div><div class="label">累计做题</div></div>
+    <div class="result-stat"><div class="num" id="hCorrect">0</div><div class="label">答对</div></div>
+    <div class="result-stat"><div class="num" id="hRate">0%</div><div class="label">总正确率</div></div>
+  </div>
+  <div class="wrong-list" id="historyList"></div>
+</div>
+
 <!-- 继续练习弹窗 -->
 <div id="resumeModal" class="modal-overlay" style="display:none">
   <div class="modal">
@@ -458,6 +491,7 @@ let browseSettings = {types:{single:true,multi:true,judge:true,short:true}, chap
 let quizList = [], curIdx = 0, answers = [], answeredSet = new Set();
 let browseList = [], browseIdx = 0;
 let wrongFilterLevel = 'all';
+let practiceFromHistory=false;
 let touchStartX = 0;
 let pendingLevel = null;
 
@@ -652,6 +686,7 @@ function renderLevelGrid(){
     }).join('');
   }
   $('wrongCount').textContent=getWrong().length+'题';
+  $('historyCount').textContent=getHistory().length+'场';
   $('totalQCount').textContent=QUESTIONS.length;
 }
 
@@ -888,6 +923,7 @@ function startQuiz(){
   let num = settings.customNum || settings.num;
   quizList = weightedRandom(qs, Math.min(num, qs.length));
   curIdx=0; answers=new Array(quizList.length).fill(null); answeredSet=new Set();
+  practiceFromHistory=false;
   clearProgress();
   showPage('quiz');
   renderQuestion();
@@ -1133,6 +1169,7 @@ function showResultPage(){
   else if(rate>=60){$('resultIcon').textContent='💪';$('resultTitle').textContent='不错！';$('resultDesc').textContent='还有提升空间，继续加油！';}
   else{$('resultIcon').textContent='📚';$('resultTitle').textContent='继续努力！';$('resultDesc').textContent='多练习错题，一定能进步！';}
   showPage('result');
+  addHistoryRecord(total,correct,wrong);
 }
 function continueQuiz(){startQuiz();}
 
@@ -1217,6 +1254,61 @@ function browseJump(){
   renderBrowse();
   input.value='';
 }
+
+// 学习记录
+function getHistory(){try{return JSON.parse(localStorage.getItem('kc_history')||'[]')}catch(e){return[]}}
+function saveHistory(h){localStorage.setItem('kc_history',JSON.stringify(h))}
+function fmtTime(ts){let d=new Date(ts),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())}
+function sessionLabel(){
+  if(practiceFromHistory)return '错题重练';
+  if(selectedLevel==='all')return '全等级混合';
+  if(selectedLevel==='exam')return '已出试卷';
+  return selectedLevel;
+}
+function addHistoryRecord(total,correct,wrong){
+  let wrongs=quizList.filter((q,i)=>answers[i]&&!answers[i].correct).map(q=>({...q}));
+  let rec={id:Date.now(),time:Date.now(),level:selectedLevel,label:sessionLabel(),total:total,correct:correct,wrong:wrong,wrongs:wrongs};
+  let h=[rec].concat(getHistory()).slice(0,200);
+  saveHistory(h);
+}
+function goHistory(){renderHistory();showPage('history')}
+function renderHistory(){
+  let h=getHistory();
+  let tot=h.reduce((s,r)=>({total:s.total+(r.total||0),correct:s.correct+(r.correct||0),wrong:s.wrong+(r.wrong||0)}),{total:0,correct:0,wrong:0});
+  $('hSessions').textContent=h.length;
+  $('hTotal').textContent=tot.total;
+  $('hCorrect').textContent=tot.correct;
+  $('hRate').textContent=tot.total>0?Math.round(tot.correct/tot.total*100)+'%':'0%';
+  let list=$('historyList');
+  if(h.length===0){list.innerHTML='<div class="empty"><div class="e-icon">🗂️</div><p>还没有学习记录，去练习一场吧</p></div>';return;}
+  list.innerHTML=h.map((r,i)=>{
+    let rate=r.total>0?Math.round(r.correct/r.total*100):0;
+    let wrongItems=(r.wrongs||[]).map(q=>{
+      let qt=(q.question||'').replace(/<[^>]+>/g,'');
+      return '<div class="wrong-card" style="border-left-color:#ff9800;margin:8px 0">'+
+        '<div class="w-q">'+formatHtml(qt.slice(0,70))+(qt.length>70?'...':'')+'</div>'+
+        '<div class="w-meta"><span>'+(q.level||'')+'</span><span>'+getTypeName(getRealType(q))+'</span></div></div>';
+    }).join('');
+    return '<div class="hist-card">'+
+      '<div class="hist-head" onclick="toggleHist('+i+')">'+
+        '<div class="hist-main"><div class="hist-label">'+r.label+'</div><div class="hist-time">'+fmtTime(r.time)+'</div></div>'+
+        '<div class="hist-rate">'+rate+'%</div></div>'+
+      '<div class="hist-stats"><span>共 '+r.total+' 题</span><span style="color:#2e7d32">对 '+r.correct+'</span><span style="color:#c62828">错 '+r.wrong+'</span></div>'+
+      '<div class="hist-body" id="histBody'+i+'" style="display:none">'+(wrongItems||'<div class="hist-empty">本场无错题</div>')+'</div>'+
+      ((r.wrongs&&r.wrongs.length)?'<div class="hist-actions"><button class="btn-primary" onclick="reviewHistoryWrong('+r.id+')">重做本场错题（'+r.wrongs.length+'）</button></div>':'')+
+    '</div>';
+  }).join('');
+}
+function toggleHist(i){let b=$('histBody'+i);b.style.display=b.style.display==='none'?'block':'none'}
+function reviewHistoryWrong(id){
+  let r=getHistory().find(x=>x.id===id);
+  if(!r||!r.wrongs||!r.wrongs.length){alert('本场没有错题');return;}
+  practiceFromHistory=true;
+  quizList=r.wrongs.slice();
+  curIdx=0;answers=new Array(quizList.length).fill(null);answeredSet=new Set();
+  clearProgress();showPage('quiz');renderQuestion();
+}
+function clearHistory(){if(confirm('确定清空全部学习记录吗？此操作不可恢复。')){saveHistory([]);renderHistory();}}
 
 // 错题本
 function goWrong(){

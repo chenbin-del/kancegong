@@ -561,6 +561,7 @@ function loadSettings(){
     settings.weights.low=Math.min(10,Math.max(0,parseInt(settings.weights.low)||0));
     if(s.seenWeight!=null)settings.seenWeight=s.seenWeight;
     if(s.types)settings.types={...settings.types,...s.types};
+    settings.types.multi=true; // 练习出题默认包含多选题
   }catch(e){}
 }
 function saveSettings(){
@@ -622,7 +623,7 @@ function getLevelStats(level){
     let t = s.total?.['已出试卷'] || {answered:0,correct:0};
     let total = EXAM_QUESTIONS.length;
     let wrong = getWrong().filter(w=>w.level==='已出试卷').length;
-    let rate = t.answered>0 ? Math.round(t.correct/t.answered*100) : 0;
+    let rate = 0; // 旧累计口径待重算，正确率暂置0；已做题数与错题保留
     let unique = s.unique?.['已出试卷'] || 0;
     return {answered:t.answered, correct:t.correct, total, wrong, rate, percent:0, unique};
   }
@@ -638,7 +639,7 @@ function getLevelStats(level){
     });
     let total = QUESTIONS.length;
     let wrong = getWrong().filter(w=>mainLevels.includes(w.level)).length;
-    let rate = totalAnswered>0 ? Math.round(totalCorrect/totalAnswered*100) : 0;
+    let rate = 0; // 旧累计口径待重算，正确率暂置0；已做题数与错题保留
     return {answered:totalAnswered, correct:totalCorrect, total, wrong, rate, percent:0, unique:totalUnique};
   }
   
@@ -646,7 +647,7 @@ function getLevelStats(level){
   let t = s.total?.[level] || {answered:0,correct:0};
   let total = STATS[level]?.total||0;
   let wrong = getWrong().filter(w=>w.level===level).length;
-  let rate = t.answered>0 ? Math.round(t.correct/t.answered*100) : 0;
+  let rate = 0; // 旧累计口径待重算，正确率暂置0；已做题数与错题保留
   let percent = total>0 ? Math.round(t.answered/total*100) : 0;
   let unique = s.unique?.[level] || 0;
   return {answered:t.answered, correct:t.correct, total, wrong, rate, percent, unique};

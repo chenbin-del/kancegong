@@ -612,26 +612,19 @@ function recordAnswer(q, correct){
     s.unique[q.level] = (s.unique[q.level]||0) + 1;
   }
   if(correct)s.total[q.level].correct++;
+  // 正确率独立累加计数器：从 0 开始，每次作答都计入，不取最后一次、不去重
+  if(!s.rate)s.rate={};
+  if(!s.rate[q.level])s.rate[q.level]={answered:0,correct:0};
+  s.rate[q.level].answered++;
+  if(correct)s.rate[q.level].correct++;
   saveStats(s);
 }
-// 按答题记录去重重算：每道题以最后一次作答结果为准，分子分母同为去重题数
-function recStats(levels){
-  let s=getStats(); let rec=s.records||{};
+// 正确率累加统计：按独立 rate 计数器汇总（纯累加，不去重、不取最后一次）；初始为 0
+function rateStats(levels){
+  let s=getStats(); let rt=s.rate||{};
   let answered=0, correct=0;
-  for(let k in rec){
-    let lv=k.split('|')[0];
-    let ok=Array.isArray(levels)?levels.includes(lv):lv===levels;
-    if(ok){answered++; if(rec[k]&&rec[k].correct)correct++;}
-  }
-  // 旧数据回退：无逐条记录时沿用累计统计
-  if(answered===0){
-    let t=s.total||{};
-    if(Array.isArray(levels)){
-      levels.forEach(lv=>{let x=t[lv]||{answered:0,correct:0};answered+=x.answered;correct+=x.correct;});
-    }else{
-      let x=t[levels]||{answered:0,correct:0};answered=x.answered;correct=x.correct;
-    }
-  }
+  let add=(lv)=>{let x=rt[lv]||{answered:0,correct:0};answered+=x.answered;correct+=x.correct;};
+  if(Array.isArray(levels)){levels.forEach(add);}else{add(levels);}
   return {answered,correct};
 }
 function getLevelStats(level){
@@ -640,20 +633,20 @@ function getLevelStats(level){
   
   if(level==='exam'){
     // 已出试卷模块
-    let rs=recStats('已出试卷');
+    let rs=rateStats('已出试卷');
     let total = EXAM_QUESTIONS.length;
     let wrong = getWrong().filter(w=>w.level==='已出试卷').length;
     let answered=rs.answered, correct=rs.correct;
+    let unique = s.unique?.['已出试卷'] || s.total?.['已出试卷']?.answered || answered;
     let rate = answered>0 ? Math.round(correct/answered*100) : 0;
-    let unique = s.unique?.['已出试卷'] || answered;
     return {answered, correct, total, wrong, rate, percent:0, unique};
   }
   
   if(level==='all'){
     // 全等级混合：汇总所有主题库等级
-    let rs=recStats(mainLevels);
+    let rs=rateStats(mainLevels);
     let totalAnswered=rs.answered, totalCorrect=rs.correct, totalUnique=0;
-    mainLevels.forEach(lv=>{ totalUnique += s.unique?.[lv] || 0; });
+    mainLevels.forEach(lv=>{ totalUnique += s.unique?.[lv] || s.total?.[lv]?.answered || 0; });
     if(totalUnique===0) totalUnique=totalAnswered;
     let total = QUESTIONS.length;
     let wrong = getWrong().filter(w=>mainLevels.includes(w.level)).length;
@@ -662,13 +655,13 @@ function getLevelStats(level){
   }
   
   // 分等级模块
-  let rs=recStats(level);
+  let rs=rateStats(level);
   let answered=rs.answered, correct=rs.correct;
   let total = STATS[level]?.total||0;
   let wrong = getWrong().filter(w=>w.level===level).length;
+  let unique = s.unique?.[level] || s.total?.[level]?.answered || answered;
   let rate = answered>0 ? Math.round(correct/answered*100) : 0;
-  let percent = total>0 ? Math.round(answered/total*100) : 0;
-  let unique = s.unique?.[level] || answered;
+  let percent = total>0 ? Math.round(unique/total*100) : 0;
   return {answered, correct, total, wrong, rate, percent, unique};
 }
 

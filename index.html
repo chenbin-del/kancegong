@@ -614,43 +614,62 @@ function recordAnswer(q, correct){
   if(correct)s.total[q.level].correct++;
   saveStats(s);
 }
+// 按答题记录去重重算：每道题以最后一次作答结果为准，分子分母同为去重题数
+function recStats(levels){
+  let s=getStats(); let rec=s.records||{};
+  let answered=0, correct=0;
+  for(let k in rec){
+    let lv=k.split('|')[0];
+    let ok=Array.isArray(levels)?levels.includes(lv):lv===levels;
+    if(ok){answered++; if(rec[k]&&rec[k].correct)correct++;}
+  }
+  // 旧数据回退：无逐条记录时沿用累计统计
+  if(answered===0){
+    let t=s.total||{};
+    if(Array.isArray(levels)){
+      levels.forEach(lv=>{let x=t[lv]||{answered:0,correct:0};answered+=x.answered;correct+=x.correct;});
+    }else{
+      let x=t[levels]||{answered:0,correct:0};answered=x.answered;correct=x.correct;
+    }
+  }
+  return {answered,correct};
+}
 function getLevelStats(level){
   let s = getStats();
   const mainLevels=['基础知识','初级工','中级工','高级工','技师','高级技师'];
   
   if(level==='exam'){
     // 已出试卷模块
-    let t = s.total?.['已出试卷'] || {answered:0,correct:0};
+    let rs=recStats('已出试卷');
     let total = EXAM_QUESTIONS.length;
     let wrong = getWrong().filter(w=>w.level==='已出试卷').length;
-    let rate = 0; // 旧累计口径待重算，正确率暂置0；已做题数与错题保留
-    let unique = s.unique?.['已出试卷'] || 0;
-    return {answered:t.answered, correct:t.correct, total, wrong, rate, percent:0, unique};
+    let answered=rs.answered, correct=rs.correct;
+    let rate = answered>0 ? Math.round(correct/answered*100) : 0;
+    let unique = s.unique?.['已出试卷'] || answered;
+    return {answered, correct, total, wrong, rate, percent:0, unique};
   }
   
   if(level==='all'){
     // 全等级混合：汇总所有主题库等级
-    let totalAnswered=0, totalCorrect=0, totalUnique=0;
-    mainLevels.forEach(lv=>{
-      let t = s.total?.[lv] || {answered:0,correct:0};
-      totalAnswered += t.answered;
-      totalCorrect += t.correct;
-      totalUnique += s.unique?.[lv] || 0;
-    });
+    let rs=recStats(mainLevels);
+    let totalAnswered=rs.answered, totalCorrect=rs.correct, totalUnique=0;
+    mainLevels.forEach(lv=>{ totalUnique += s.unique?.[lv] || 0; });
+    if(totalUnique===0) totalUnique=totalAnswered;
     let total = QUESTIONS.length;
     let wrong = getWrong().filter(w=>mainLevels.includes(w.level)).length;
-    let rate = 0; // 旧累计口径待重算，正确率暂置0；已做题数与错题保留
+    let rate = totalAnswered>0 ? Math.round(totalCorrect/totalAnswered*100) : 0;
     return {answered:totalAnswered, correct:totalCorrect, total, wrong, rate, percent:0, unique:totalUnique};
   }
   
   // 分等级模块
-  let t = s.total?.[level] || {answered:0,correct:0};
+  let rs=recStats(level);
+  let answered=rs.answered, correct=rs.correct;
   let total = STATS[level]?.total||0;
   let wrong = getWrong().filter(w=>w.level===level).length;
-  let rate = 0; // 旧累计口径待重算，正确率暂置0；已做题数与错题保留
-  let percent = total>0 ? Math.round(t.answered/total*100) : 0;
-  let unique = s.unique?.[level] || 0;
-  return {answered:t.answered, correct:t.correct, total, wrong, rate, percent, unique};
+  let rate = answered>0 ? Math.round(correct/answered*100) : 0;
+  let percent = total>0 ? Math.round(answered/total*100) : 0;
+  let unique = s.unique?.[level] || answered;
+  return {answered, correct, total, wrong, rate, percent, unique};
 }
 
 // 错题本
